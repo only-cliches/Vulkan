@@ -68,7 +68,9 @@ fn main() -> Result<()> {
                             app.frameRate = 1_000_000.0f64  / last_frame_since as f64;
                             app.frameTime = SystemTime::now();
                             
+                            let start = SystemTime::now();
                             app.draw().unwrap();
+                            app.frameTimeUsed = (start.elapsed().unwrap().as_micros() as f64 / FPS_60 as f64) * 100.0f64;
                         }
                     },
                     _ => { }

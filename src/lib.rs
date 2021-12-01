@@ -194,7 +194,8 @@ pub struct App {
     light_position: Vector3<f32>,
     text: String,
     pub frameTime: std::time::SystemTime,
-    pub frameRate: f64
+    pub frameRate: f64,
+    pub frameTimeUsed: f64
 }
 impl App {
     pub fn new(event_loop: &EventLoop<()>) -> Result<Self> {
@@ -1177,7 +1178,8 @@ impl App {
             light_position: Vector3::new(0.0, -16.0, -16.0),
             text: "Hello egui!".to_string(),
             frameTime: std::time::SystemTime::now(),
-            frameRate: 0.0f64
+            frameRate: Default::default(),
+            frameTimeUsed: Default::default()
         })
     }
 
@@ -1329,78 +1331,46 @@ impl App {
             }
 
             self.egui_integration.begin_frame();
-            egui::SidePanel::left("my_side_panel").show(&self.egui_integration.context(), |ui| {
-                ui.heading("Hello");
-                ui.label("Hello egui!");
-                ui.separator();
-                ui.horizontal(|ui| {
-                    ui.label("Theme");
-                    let id = ui.make_persistent_id("theme_combo_box_side");
-                    egui::ComboBox::from_id_source(id)
-                        .selected_text(format!("{:?}", self.theme))
-                        .show_ui(ui, |ui| {
-                            ui.selectable_value(&mut self.theme, EguiTheme::Dark, "Dark");
-                            ui.selectable_value(&mut self.theme, EguiTheme::Light, "Light");
-                        });
-                });
-                ui.separator();
-                ui.hyperlink("https://github.com/emilk/egui");
-                ui.separator();
-                ui.label("Rotation");
-                ui.add(egui::widgets::DragValue::new(&mut self.rotation));
-                ui.add(egui::widgets::Slider::new(
-                    &mut self.rotation,
-                    -180.0..=180.0,
-                ));
-                ui.label("Light Position");
-                ui.horizontal(|ui| {
-                    ui.label("x:");
-                    ui.add(egui::widgets::DragValue::new(&mut self.light_position.x));
-                    ui.label("y:");
-                    ui.add(egui::widgets::DragValue::new(&mut self.light_position.y));
-                    ui.label("z:");
-                    ui.add(egui::widgets::DragValue::new(&mut self.light_position.z));
-                });
-                ui.separator();
-                ui.text_edit_singleline(&mut self.text);
-            });
-            egui::Window::new("My Window")
+
+            egui::Window::new("Vulkan Example")
                 .resizable(true)
                 .scroll(true)
                 .show(&self.egui_integration.context(), |ui| {
-                    ui.heading("Hello");
-                    ui.label("Hello egui!");
-                    ui.separator();
-                    ui.horizontal(|ui| {
-                        ui.label("Theme");
-                        let id = ui.make_persistent_id("theme_combo_box_window");
-                        egui::ComboBox::from_id_source(id)
-                            .selected_text(format!("{:?}", self.theme))
-                            .show_ui(ui, |ui| {
-                                ui.selectable_value(&mut self.theme, EguiTheme::Dark, "Dark");
-                                ui.selectable_value(&mut self.theme, EguiTheme::Light, "Light");
-                            });
-                    });
-                    ui.separator();
-                    ui.hyperlink("https://github.com/emilk/egui");
-                    ui.separator();
-                    ui.label("Rotation");
-                    ui.add(egui::widgets::DragValue::new(&mut self.rotation));
-                    ui.add(egui::widgets::Slider::new(
-                        &mut self.rotation,
-                        -180.0..=180.0,
-                    ));
-                    ui.label("Light Position");
-                    ui.horizontal(|ui| {
-                        ui.label("x:");
-                        ui.add(egui::widgets::DragValue::new(&mut self.light_position.x));
-                        ui.label("y:");
-                        ui.add(egui::widgets::DragValue::new(&mut self.light_position.y));
-                        ui.label("z:");
-                        ui.add(egui::widgets::DragValue::new(&mut self.light_position.z));
-                    });
-                    ui.separator();
-                    ui.text_edit_singleline(&mut self.text);
+                    ui.label(format!("FPS: {:.2}", self.frameRate));
+                    ui.label(format!("Frame Time: {:.2}%", self.frameTimeUsed));
+                    // ui.heading("Hello");
+                    // ui.label("Hello egui!");
+                    // ui.separator();
+                    // ui.horizontal(|ui| {
+                    //     ui.label("Theme");
+                    //     let id = ui.make_persistent_id("theme_combo_box_window");
+                    //     egui::ComboBox::from_id_source(id)
+                    //         .selected_text(format!("{:?}", self.theme))
+                    //         .show_ui(ui, |ui| {
+                    //             ui.selectable_value(&mut self.theme, EguiTheme::Dark, "Dark");
+                    //             ui.selectable_value(&mut self.theme, EguiTheme::Light, "Light");
+                    //         });
+                    // });
+                    // ui.separator();
+                    // ui.hyperlink("https://github.com/emilk/egui");
+                    // ui.separator();
+                    // ui.label("Rotation");
+                    // ui.add(egui::widgets::DragValue::new(&mut self.rotation));
+                    // ui.add(egui::widgets::Slider::new(
+                    //     &mut self.rotation,
+                    //     -180.0..=180.0,
+                    // ));
+                    // ui.label("Light Position");
+                    // ui.horizontal(|ui| {
+                    //     ui.label("x:");
+                    //     ui.add(egui::widgets::DragValue::new(&mut self.light_position.x));
+                    //     ui.label("y:");
+                    //     ui.add(egui::widgets::DragValue::new(&mut self.light_position.y));
+                    //     ui.label("z:");
+                    //     ui.add(egui::widgets::DragValue::new(&mut self.light_position.z));
+                    // });
+                    // ui.separator();
+                    // ui.text_edit_singleline(&mut self.text);
                 });
             let (_, shapes) = self.egui_integration.end_frame(&mut self.window);
             let clipped_meshes = self.egui_integration.context().tessellate(shapes);
