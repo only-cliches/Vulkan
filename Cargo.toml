@@ -1,0 +1,343 @@
+[package]
+name = "Vulkan_Rust"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+winit = "0.25.0"
+ash = "0.33.2"
+num = "0.4.0"
+image = "0.23.14"
+memoffset = "0.6.4"
+egui-winit-ash-integration = "0.2.0"
+ash-window = "0.7.0"
+crevice = "0.7.1"
+mint = "0.5.6"
+tobj = "3.0.1"
+anyhow = "1.0.51"
+gpu-allocator = "0.10.0"
+mobile-entry-point = "0.1.1"
+egui = "0.14.2"
+
+[dependencies.cgmath]
+version = "0.18.0"
+features = ["mint"]
+
+[dependencies.bitflags]
+version = ">= 1.0.4"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+metal = "0.17.0"
+cocoa = "0.18.4"
+objc  = "0.2.5"
+
+[target.'cfg(target_os = "windows")'.dependencies]
+winapi = { version = "0.3.5", features = ["windef", "libloaderapi"] }
+
+# tutorial examples shortcut ---------------------------------
+
+[[bin]]
+name = "triangle"
+path = "src/00_triangle.rs"
+
+[[bin]]
+name = "pipelines"
+path = "src/01_pipelines.rs"
+
+[[bin]]
+name = "descriptorsets"
+path = "src/02_descriptorsets.rs"
+
+[[bin]]
+name = "dynamicuniformbuffer"
+path = "src/03_dynamicuniformbuffer.rs"
+
+[[bin]]
+name = "pushconstants"
+path = "src/04_pushconstants.rs"
+
+[[bin]]
+name = "specializationconstants"
+path = "src/05_specializationconstants.rs"
+
+[[bin]]
+name = "texture"
+path = "src/06_texture.rs"
+
+[[bin]]
+name = "texturearray"
+path = "src/07_texturearray.rs"
+
+[[bin]]
+name = "texturecubemap"
+path = "src/08_texturecubemap.rs"
+
+[[bin]]
+name = "texturecubemaparray"
+path = "src/09_texturecubemaparray.rs"
+
+[[bin]]
+name = "texture3d"
+path = "src/10_texture3d.rs"
+
+[[bin]]
+name = "inputattachments"
+path = "src/11_inputattachments.rs"
+
+[[bin]]
+name = "subpasses"
+path = "src/12_subpasses.rs"
+
+[[bin]]
+name = "offscreen"
+path = "src/13_offscreen.rs"
+
+[[bin]]
+name = "particlefire"
+path = "src/14_particlefire.rs"
+
+[[bin]]
+name = "stencilbuffer"
+path = "src/15_stencilbuffer.rs"
+
+[[bin]]
+name = "gltfloading"
+path = "src/16_gltfloading.rs"
+
+[[bin]]
+name = "gltfskinning"
+path = "src/17_gltfskinning.rs"
+
+[[bin]]
+name = "gltfscenerendering"
+path = "src/18_gltfscenerendering.rs"
+
+[[bin]]
+name = "multisampling"
+path = "src/19_multisampling.rs"
+
+[[bin]]
+name = "hdr"
+path = "src/20_hdr.rs"
+
+[[bin]]
+name = "shadowmapping"
+path = "src/21_shadowmapping.rs"
+
+[[bin]]
+name = "shadowmappingcascade"
+path = "src/22_shadowmappingcascade.rs"
+
+[[bin]]
+name = "shadowmappingomni"
+path = "src/23_shadowmappingomni.rs"
+
+[[bin]]
+name = "texturemipmapgen"
+path = "src/24_texturemipmapgen.rs"
+
+[[bin]]
+name = "screenshot"
+path = "src/25_screenshot.rs"
+
+[[bin]]
+name = "oit"
+path = "src/26_oit.rs"
+
+[[bin]]
+name = "multithreading"
+path = "src/27_multithreading.rs"
+
+[[bin]]
+name = "instancing"
+path = "src/28_instancing.rs"
+
+[[bin]]
+name = "indirectdraw"
+path = "src/29_indirectdraw.rs"
+
+[[bin]]
+name = "occlusionquery"
+path = "src/30_occlusionquery.rs"
+
+[[bin]]
+name = "pipelinestatistics"
+path = "src/31_pipelinestatistics.rs"
+
+[[bin]]
+name = "pbrbasic"
+path = "src/32_pbrbasic.rs"
+
+[[bin]]
+name = "pbribl"
+path = "src/33_pbribl.rs"
+
+[[bin]]
+name = "pbrtexture"
+path = "src/34_pbrtexture.rs"
+
+[[bin]]
+name = "deferred"
+path = "src/35_deferred.rs"
+
+[[bin]]
+name = "deferredmultisampling"
+path = "src/36_deferredmultisampling.rs"
+
+[[bin]]
+name = "deferredshadows"
+path = "src/37_deferredshadows.rs"
+
+[[bin]]
+name = "ssao"
+path = "src/38_ssao.rs"
+
+[[bin]]
+name = "computeshader"
+path = "src/39_computeshader.rs"
+
+[[bin]]
+name = "computeparticles"
+path = "src/40_computeparticles.rs"
+
+[[bin]]
+name = "computenbody"
+path = "src/41_computenbody.rs"
+
+[[bin]]
+name = "computeraytracing"
+path = "src/42_computeraytracing.rs"
+
+[[bin]]
+name = "computecloth"
+path = "src/43_computecloth.rs"
+
+[[bin]]
+name = "computecullandlod"
+path = "src/44_computecullandlod.rs"
+
+[[bin]]
+name = "geometryshader"
+path = "src/45_geometryshader.rs"
+
+[[bin]]
+name = "viewportarray"
+path = "src/46_viewportarray.rs"
+
+[[bin]]
+name = "displacement"
+path = "src/47_displacement.rs"
+
+[[bin]]
+name = "terraintessellation"
+path = "src/48_terraintessellation.rs"
+
+[[bin]]
+name = "tessellation"
+path = "src/49_tessellation.rs"
+
+[[bin]]
+name = "raytracingbasic"
+path = "src/50_raytracingbasic.rs"
+
+[[bin]]
+name = "raytracingshadows"
+path = "src/51_raytracingshadows.rs"
+
+[[bin]]
+name = "raytracingreflections"
+path = "src/52_raytracingreflections.rs"
+
+[[bin]]
+name = "raytracingcallable"
+path = "src/53_raytracingcallable.rs"
+
+[[bin]]
+name = "rayquery"
+path = "src/54_rayquery.rs"
+
+[[bin]]
+name = "renderheadless"
+path = "src/55_renderheadless.rs"
+
+[[bin]]
+name = "computeheadless"
+path = "src/56_computeheadless.rs"
+
+[[bin]]
+name = "textoverlay"
+path = "src/57_textoverlay.rs"
+
+[[bin]]
+name = "distancefieldfonts"
+path = "src/58_distancefieldfonts.rs"
+
+[[bin]]
+name = "imgui"
+path = "src/59_imgui.rs"
+
+[[bin]]
+name = "radialblur"
+path = "src/60_radialblur.rs"
+
+[[bin]]
+name = "bloom"
+path = "src/61_bloom.rs"
+
+[[bin]]
+name = "parallaxmapping"
+path = "src/62_parallaxmapping.rs"
+
+[[bin]]
+name = "sphericalenvmapping"
+path = "src/63_sphericalenvmapping.rs"
+
+[[bin]]
+name = "conservativeraster"
+path = "src/64_conservativeraster.rs"
+
+[[bin]]
+name = "pushdescriptors"
+path = "src/65_pushdescriptors.rs"
+
+[[bin]]
+name = "inlineuniformblocks"
+path = "src/66_inlineuniformblocks.rs"
+
+[[bin]]
+name = "multiview"
+path = "src/67_multiview.rs"
+
+[[bin]]
+name = "conditionalrender"
+path = "src/68_conditionalrender.rs"
+
+[[bin]]
+name = "debugmarker"
+path = "src/69_debugmarker.rs"
+
+[[bin]]
+name = "negativeviewportheight"
+path = "src/70_negativeviewportheight.rs"
+
+[[bin]]
+name = "variablerateshading"
+path = "src/71_variablerateshading.rs"
+
+[[bin]]
+name = "descriptorindexing"
+path = "src/72_descriptorindexing.rs"
+
+[[bin]]
+name = "dynamicrendering"
+path = "src/73_dynamicrendering.rs"
+
+[[bin]]
+name = "gears"
+path = "src/74_gears.rs"
+
+[[bin]]
+name = "vulkanscene"
+path = "src/75_vulkanscene.rs"

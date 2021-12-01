@@ -1,0 +1,8 @@
+[app]
+name = "vulkan"
+stylized-name = "Vulkan"
+domain = "scottlott.com"
+template-pack = "winit"
+
+[apple]
+development-team = "8VCRS2R88L"
