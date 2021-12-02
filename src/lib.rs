@@ -198,68 +198,55 @@ pub struct App {
     pub frameTimeUsed: f64
 }
 impl App {
-    pub fn new(event_loop: &EventLoop<()>) -> Result<Self> {
-        let (width, height) = (800, 600);
-        let title = "Test";
 
-        // Create Window
-        let window = WindowBuilder::new()
-            .with_title(title)
-            .with_inner_size(PhysicalSize::new(width, height))
-            .with_resizable(true)
-            .build(event_loop)?;
 
-        // Create Entry
-        let entry = unsafe { Entry::new() }?;
+    fn create_instance(title: &str, window: &Window, entry: &Entry) -> Result<Instance> {
+        // App info
+        let app_name = CString::new(title)?;
+        let engine_name = CString::new("Vulkan Engine")?;
+        let app_info = vk::ApplicationInfo::builder()
+            .api_version(vk::make_api_version(0, 1, 2, 0))
+            .application_version(vk::make_api_version(0, 0, 1, 0))
+            .application_name(&app_name)
+            .engine_version(vk::make_api_version(0, 0, 1, 0))
+            .engine_name(&engine_name);
 
-        // Create Instance
-        let instance = {
-            // App info
-            let app_name = CString::new(title)?;
-            let engine_name = CString::new("Vulkan Engine")?;
-            let app_info = vk::ApplicationInfo::builder()
-                .api_version(vk::make_api_version(0, 1, 2, 0))
-                .application_version(vk::make_api_version(0, 0, 1, 0))
-                .application_name(&app_name)
-                .engine_version(vk::make_api_version(0, 0, 1, 0))
-                .engine_name(&engine_name);
+        // Get extensions for creating Surface
+        let extension_names = enumerate_required_extensions(window)?;
+        let mut extension_names = extension_names
+            .iter()
+            .map(|name| name.as_ptr())
+            .collect::<Vec<_>>();
+        if ENABLE_VALIDATION_LAYERS {
+            extension_names.push(DebugUtils::name().as_ptr());
+        }
 
-            // Get extensions for creating Surface
-            let extension_names = enumerate_required_extensions(&window)?;
-            let mut extension_names = extension_names
-                .iter()
-                .map(|name| name.as_ptr())
-                .collect::<Vec<_>>();
-            if ENABLE_VALIDATION_LAYERS {
-                extension_names.push(DebugUtils::name().as_ptr());
-            }
+        // layer for validation
+        let enabled_layer_names = VALIDATION
+            .iter()
+            .map(|layer_name| CString::new(*layer_name).unwrap())
+            .collect::<Vec<_>>();
+        let enabled_layer_names = enabled_layer_names
+            .iter()
+            .map(|layer_name| layer_name.as_ptr())
+            .collect::<Vec<_>>();
 
-            // layer for validation
-            let enabled_layer_names = VALIDATION
-                .iter()
-                .map(|layer_name| CString::new(*layer_name).unwrap())
-                .collect::<Vec<_>>();
-            let enabled_layer_names = enabled_layer_names
-                .iter()
-                .map(|layer_name| layer_name.as_ptr())
-                .collect::<Vec<_>>();
-
-            // instance create info
-            let create_info = vk::InstanceCreateInfo::builder()
-                .application_info(&app_info)
-                .enabled_extension_names(&extension_names);
-            let create_info = if ENABLE_VALIDATION_LAYERS {
-                create_info.enabled_layer_names(&enabled_layer_names)
-            } else {
-                create_info
-            };
-
-            // crate instance
-            unsafe { entry.create_instance(&create_info, None)? }
+        // instance create info
+        let create_info = vk::InstanceCreateInfo::builder()
+            .application_info(&app_info)
+            .enabled_extension_names(&extension_names);
+        let create_info = if ENABLE_VALIDATION_LAYERS {
+            create_info.enabled_layer_names(&enabled_layer_names)
+        } else {
+            create_info
         };
 
-        #[cfg(debug_assertions)]
-        let (debug_utils_loader, debug_callback) = {
+        // crate instance
+        Ok(unsafe { entry.create_instance(&create_info, None)? })
+    }
+
+    #[cfg(debug_assertions)]
+    fn create_debug_callbacks(entry: &Entry, instance: &Instance) -> Result<(DebugUtils, DebugUtilsMessengerEXT)> {
             // callback function
             unsafe extern "system" fn callback(
                 message_severity: vk::DebugUtilsMessageSeverityFlagsEXT,
@@ -299,19 +286,19 @@ impl App {
                             | vk::DebugUtilsMessageTypeFlagsEXT::VALIDATION,
                     )
                     .pfn_user_callback(Some(callback));
-            let debug_utils_loader = DebugUtils::new(&entry, &instance);
+            let debug_utils_loader = DebugUtils::new(entry, instance);
             let debug_callback = unsafe {
                 debug_utils_loader
                     .create_debug_utils_messenger(&debug_utils_messenger_create_info_ext, None)?
             };
-            (debug_utils_loader, debug_callback)
-        };
 
-        // Create Surface
+            Ok((debug_utils_loader, debug_callback))
+    }
+
+    fn create_surface(entry: &Entry, instance: &Instance, window: &Window) -> Result<(Surface, vk::SurfaceKHR, vk::PhysicalDevice, u32, u32)> {
         let surface_loader = Surface::new(&entry, &instance);
-        let surface = unsafe { create_surface(&entry, &instance, &window, None)? };
+        let surface = unsafe { create_surface(&entry, &instance, window, None)? };
 
-        // Select Physical Device
         let (physical_device, graphics_queue_index, present_queue_index) = {
             // filter physical device
             let physical_devices = unsafe { instance.enumerate_physical_devices()? };
@@ -404,57 +391,56 @@ impl App {
             physical_devices.next().unwrap()
         };
 
-        // Create Device
-        let device = {
-            let mut unique_queue_families = HashSet::new();
-            unique_queue_families.insert(graphics_queue_index);
-            unique_queue_families.insert(present_queue_index);
+        Ok((surface_loader, surface, physical_device, graphics_queue_index, present_queue_index))
+    }
 
-            let queue_priorities = [1.0];
-            let mut queue_create_infos = vec![];
-            for &queue_family in unique_queue_families.iter() {
-                let queue_create_info = vk::DeviceQueueCreateInfo::builder()
-                    .queue_family_index(queue_family)
-                    .queue_priorities(&queue_priorities)
-                    .build();
-                queue_create_infos.push(queue_create_info);
-            }
+    fn create_device(instance: &Instance, graphics_queue_index: u32, present_queue_index: u32, physical_device: &vk::PhysicalDevice) -> Result<Device> {
+        let mut unique_queue_families = HashSet::new();
+        unique_queue_families.insert(graphics_queue_index);
+        unique_queue_families.insert(present_queue_index);
 
-            let enabled_extension_names = [Swapchain::name().as_ptr()];
+        let queue_priorities = [1.0];
+        let mut queue_create_infos = vec![];
+        for &queue_family in unique_queue_families.iter() {
+            let queue_create_info = vk::DeviceQueueCreateInfo::builder()
+                .queue_family_index(queue_family)
+                .queue_priorities(&queue_priorities)
+                .build();
+            queue_create_infos.push(queue_create_info);
+        }
 
-            let device_create_info = vk::DeviceCreateInfo::builder()
-                .queue_create_infos(queue_create_infos.as_slice())
-                .enabled_extension_names(&enabled_extension_names);
+        let enabled_extension_names = [Swapchain::name().as_ptr()];
 
-            unsafe { instance.create_device(physical_device, &device_create_info, None)? }
-        };
+        let device_create_info = vk::DeviceCreateInfo::builder()
+            .queue_create_infos(queue_create_infos.as_slice())
+            .enabled_extension_names(&enabled_extension_names);
 
-        // Create Queues
-        let graphics_queue = unsafe { device.get_device_queue(graphics_queue_index, 0) };
-        let present_queue = unsafe { device.get_device_queue(present_queue_index, 0) };
+        Ok(unsafe { instance.create_device(*physical_device, &device_create_info, None)? })
+    }
 
-        // Create Graphics Command Pool
-        let graphics_command_pool = {
-            let command_pool_create_info = vk::CommandPoolCreateInfo::builder()
-                .queue_family_index(graphics_queue_index)
-                .flags(vk::CommandPoolCreateFlags::RESET_COMMAND_BUFFER);
-            unsafe { device.create_command_pool(&command_pool_create_info, None)? }
-        };
+    fn create_command_pool(graphics_queue_index: u32, device: &Device) -> Result<vk::CommandPool> {
 
-        // Create Swapchain
+        let command_pool_create_info = vk::CommandPoolCreateInfo::builder()
+        .queue_family_index(graphics_queue_index)
+        .flags(vk::CommandPoolCreateFlags::RESET_COMMAND_BUFFER);
+        Ok(unsafe { device.create_command_pool(&command_pool_create_info, None)? })
+    }
+
+    fn create_swapchain(width: u32, height: u32, graphics_queue_index: u32, present_queue_index: u32, surface_loader: &Surface, surface: &vk::SurfaceKHR, physical_device: &vk::PhysicalDevice, instance: &Instance, device: &Device) -> Result<(Swapchain, vk::SwapchainKHR, vk::SurfaceFormatKHR, vk::Extent2D, Vec<vk::Image>)> {
+
         let swapchain_loader = Swapchain::new(&instance, &device);
         let (swapchain, format, extent) = {
             let capabilities = unsafe {
-                surface_loader.get_physical_device_surface_capabilities(physical_device, surface)?
+                surface_loader.get_physical_device_surface_capabilities(*physical_device, *surface)?
             };
             let formats = unsafe {
                 surface_loader
-                    .get_physical_device_surface_formats(physical_device, surface)
+                    .get_physical_device_surface_formats(*physical_device, *surface)
                     .unwrap()
             };
             let present_modes = unsafe {
                 surface_loader
-                    .get_physical_device_surface_present_modes(physical_device, surface)
+                    .get_physical_device_surface_present_modes(*physical_device, *surface)
                     .unwrap()
             };
 
@@ -502,7 +488,7 @@ impl App {
                 };
 
             let swapchain_create_info = vk::SwapchainCreateInfoKHR::builder()
-                .surface(surface)
+                .surface(*surface)
                 .min_image_count(image_count)
                 .image_format(format.format)
                 .image_color_space(format.color_space)
@@ -522,6 +508,92 @@ impl App {
         };
         let swapchain_images = unsafe { swapchain_loader.get_swapchain_images(swapchain)? };
 
+        Ok((swapchain_loader, swapchain, format, extent, swapchain_images))
+    }
+
+    fn create_render_pass(device: &Device, format: &vk::SurfaceFormatKHR) -> Result<vk::RenderPass> {
+        // Attachments
+        let attachments = [
+            vk::AttachmentDescription::builder()
+                .format(format.format)
+                .samples(vk::SampleCountFlags::TYPE_1)
+                .load_op(vk::AttachmentLoadOp::CLEAR)
+                .store_op(vk::AttachmentStoreOp::STORE)
+                .stencil_load_op(vk::AttachmentLoadOp::DONT_CARE)
+                .stencil_store_op(vk::AttachmentStoreOp::DONT_CARE)
+                .initial_layout(vk::ImageLayout::UNDEFINED)
+                .final_layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
+                .build(),
+            vk::AttachmentDescription::builder()
+                .format(vk::Format::D32_SFLOAT)
+                .samples(vk::SampleCountFlags::TYPE_1)
+                .load_op(vk::AttachmentLoadOp::CLEAR)
+                .store_op(vk::AttachmentStoreOp::DONT_CARE)
+                .stencil_load_op(vk::AttachmentLoadOp::DONT_CARE)
+                .stencil_store_op(vk::AttachmentStoreOp::DONT_CARE)
+                .initial_layout(vk::ImageLayout::UNDEFINED)
+                .final_layout(vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL)
+                .build(),
+        ];
+        // color reference
+        let color_reference = [vk::AttachmentReference::builder()
+            .attachment(0)
+            .layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
+            .build()];
+        // depth reference
+        let depth_reference = vk::AttachmentReference::builder()
+            .attachment(1)
+            .layout(vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+        // subpass descriptionを作成
+        let subpasses = [vk::SubpassDescription::builder()
+            .pipeline_bind_point(vk::PipelineBindPoint::GRAPHICS)
+            .color_attachments(&color_reference)
+            .depth_stencil_attachment(&depth_reference)
+            .build()];
+        // create render pass
+        let render_pass_create_info = vk::RenderPassCreateInfo::builder()
+            .attachments(&attachments)
+            .subpasses(&subpasses);
+
+        Ok(unsafe { device.create_render_pass(&render_pass_create_info, None)? })
+    }
+
+    pub fn new(event_loop: &EventLoop<()>) -> Result<Self> {
+        let (width, height) = (800, 600);
+        let title = "Test";
+
+        // Create Window
+        let window = WindowBuilder::new()
+            .with_title(title)
+            .with_inner_size(PhysicalSize::new(width, height))
+            .with_resizable(true)
+            .build(event_loop)?;
+
+        // Create Entry
+        let entry = unsafe { Entry::new() }?;
+
+        // Create Instance
+        let instance = Self::create_instance(title, &window, &entry)?;
+
+        #[cfg(debug_assertions)]
+        let (debug_utils_loader, debug_callback) = Self::create_debug_callbacks(&entry, &instance)?;
+
+        // Create Surface
+        let (surface_loader, surface, physical_device, graphics_queue_index, present_queue_index) = Self::create_surface(&entry, &instance, &window)?;
+
+        // Create Device
+        let device = Self::create_device(&instance, graphics_queue_index, present_queue_index, &physical_device)?;
+
+        // Create Queues
+        let graphics_queue = unsafe { device.get_device_queue(graphics_queue_index, 0) };
+        let present_queue = unsafe { device.get_device_queue(present_queue_index, 0) };
+
+        // Create Graphics Command Pool
+        let graphics_command_pool = Self::create_command_pool(graphics_queue_index, &device)?;
+
+        // Create Swapchain
+        let (swapchain_loader, swapchain, format, extent, swapchain_images) = Self::create_swapchain(width, height, graphics_queue_index, present_queue_index, &surface_loader, &surface, &physical_device, &instance, &device)?;
+
         // Prepare gpu-allocator's Allocator
         let mut allocator = {
             Allocator::new(&AllocatorCreateDesc {
@@ -534,51 +606,7 @@ impl App {
         };
 
         // Create RenderPass
-        let render_pass = {
-            // Attachments
-            let attachments = [
-                vk::AttachmentDescription::builder()
-                    .format(format.format)
-                    .samples(vk::SampleCountFlags::TYPE_1)
-                    .load_op(vk::AttachmentLoadOp::CLEAR)
-                    .store_op(vk::AttachmentStoreOp::STORE)
-                    .stencil_load_op(vk::AttachmentLoadOp::DONT_CARE)
-                    .stencil_store_op(vk::AttachmentStoreOp::DONT_CARE)
-                    .initial_layout(vk::ImageLayout::UNDEFINED)
-                    .final_layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
-                    .build(),
-                vk::AttachmentDescription::builder()
-                    .format(vk::Format::D32_SFLOAT)
-                    .samples(vk::SampleCountFlags::TYPE_1)
-                    .load_op(vk::AttachmentLoadOp::CLEAR)
-                    .store_op(vk::AttachmentStoreOp::DONT_CARE)
-                    .stencil_load_op(vk::AttachmentLoadOp::DONT_CARE)
-                    .stencil_store_op(vk::AttachmentStoreOp::DONT_CARE)
-                    .initial_layout(vk::ImageLayout::UNDEFINED)
-                    .final_layout(vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL)
-                    .build(),
-            ];
-            // color reference
-            let color_reference = [vk::AttachmentReference::builder()
-                .attachment(0)
-                .layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
-                .build()];
-            // depth reference
-            let depth_reference = vk::AttachmentReference::builder()
-                .attachment(1)
-                .layout(vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
-            // subpass descriptionを作成
-            let subpasses = [vk::SubpassDescription::builder()
-                .pipeline_bind_point(vk::PipelineBindPoint::GRAPHICS)
-                .color_attachments(&color_reference)
-                .depth_stencil_attachment(&depth_reference)
-                .build()];
-            // create render pass
-            let render_pass_create_info = vk::RenderPassCreateInfo::builder()
-                .attachments(&attachments)
-                .subpasses(&subpasses);
-            unsafe { device.create_render_pass(&render_pass_create_info, None)? }
-        };
+        let render_pass = Self::create_render_pass(&device, &format)?;
 
         // Create framebuffers and depth buffers
         let (
