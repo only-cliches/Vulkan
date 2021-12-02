@@ -21,6 +21,9 @@ gpu-allocator = "0.10.0"
 mobile-entry-point = "0.1.1"
 egui = "0.14.2"
 
+[lib]
+crate-type = ["staticlib", "cdylib", "rlib"]
+
 [dependencies.cgmath]
 version = "0.18.0"
 features = ["mint"]
@@ -35,6 +38,14 @@ objc  = "0.2.5"
 
 [target.'cfg(target_os = "windows")'.dependencies]
 winapi = { version = "0.3.5", features = ["windef", "libloaderapi"] }
+
+[target.'cfg(target_os = "android")'.dependencies]
+android_logger = "0.9.0"
+log = "0.4.11"
+ndk-glue = "0.2.1"
+
+[target.'cfg(not(target_os = "android"))'.dependencies]
+simple_logger = "1.11.0"
 
 # tutorial examples shortcut ---------------------------------
 

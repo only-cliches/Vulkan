@@ -1,3 +1,4 @@
+use mobile_entry_point::mobile_entry_point;
 use std::ffi::{CStr, CString};
 use std::mem::ManuallyDrop;
 use std::os::raw::c_char;
@@ -8,7 +9,7 @@ use std::sync::{Arc, Mutex};
 use std::time::SystemTime;
 use std::{collections::HashSet, u64};
 
-use Vulkan_Rust::App;
+use Vulkan_Rust::common::renderer::App;
 use anyhow::Result;
 use ash::extensions::ext::DebugUtils;
 use ash::extensions::khr::{Surface, Swapchain};
@@ -70,7 +71,8 @@ fn main() -> Result<()> {
                             
                             let start = SystemTime::now();
                             app.draw().unwrap();
-                            app.frameTimeUsed = (start.elapsed().unwrap().as_micros() as f64 / FPS_60 as f64) * 100.0f64;
+                            app.frameTimeUsed = start.elapsed().unwrap().as_micros() as f64;
+                            // app.frameTimeUsed = (start.elapsed().unwrap().as_micros() as f64 / FPS_60 as f64) * 100.0f64;
                         }
                     },
                     _ => { }
