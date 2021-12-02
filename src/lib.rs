@@ -41,6 +41,8 @@ fn main() {
     let event_loop = EventLoop::new();
     let mut app = App::new(&event_loop).unwrap();
 
+    let mut counter: u32 = 0;
+
 
     event_loop.run(move |event, _, control_flow| {
 
@@ -68,13 +70,21 @@ fn main() {
                         let last_frame_since = elapsed.as_micros();
 
                         if last_frame_since > FPS_60 {
+
+                            counter += 1;
+                            counter = counter % 60;
         
                             app.frameRate = 1_000_000.0f64  / last_frame_since as f64;
                             app.frameTime = SystemTime::now();
                             
                             let start = SystemTime::now();
                             app.draw().unwrap();
-                            app.frameTimeUsed = start.elapsed().unwrap().as_micros() as f64;
+
+                            if counter == 0 {
+                                app.frameTimeUsed = start.elapsed().unwrap().as_micros() as f64;
+                            }
+
+                            
                             // app.frameTimeUsed = (start.elapsed().unwrap().as_micros() as f64 / FPS_60 as f64) * 100.0f64;
                         }
                     },
