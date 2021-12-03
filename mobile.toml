@@ -1,6 +1,6 @@
 [app]
-name = "vulkan"
-stylized-name = "Vulkan"
+name = "vulkan_rust"
+stylized-name = "Vulkan Rust"
 domain = "scottlott.com"
 template-pack = "winit"
 

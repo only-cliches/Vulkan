@@ -1,4 +1,5 @@
 use mobile_entry_point::mobile_entry_point;
+use vulkan_rust::common::renderer::App;
 use std::ffi::{CStr, CString};
 use std::mem::ManuallyDrop;
 use std::os::raw::c_char;
@@ -9,7 +10,6 @@ use std::sync::{Arc, Mutex};
 use std::time::SystemTime;
 use std::{collections::HashSet, u64};
 
-use Vulkan_Rust::common::renderer::App;
 use anyhow::Result;
 use ash::extensions::ext::DebugUtils;
 use ash::extensions::khr::{Surface, Swapchain};

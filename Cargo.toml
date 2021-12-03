@@ -1,5 +1,5 @@
 [package]
-name = "Vulkan_Rust"
+name = "vulkan_rust"
 version = "0.1.0"
 edition = "2021"
 
@@ -9,9 +9,9 @@ edition = "2021"
 winit = "0.25.0"
 ash = "0.33.2"
 num = "0.4.0"
-image = "0.23.14"
+# image = "0.23.14"
 memoffset = "0.6.4"
-egui-winit-ash-integration = "0.2.0"
+egui-winit-ash-integration = { path = "./egui-winit-ash-integration" }
 ash-window = "0.7.0"
 crevice = "0.7.1"
 mint = "0.5.6"

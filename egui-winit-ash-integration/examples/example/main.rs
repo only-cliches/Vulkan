@@ -31,10 +31,10 @@ const VALIDATION: &[&str] = &["VK_LAYER_KHRONOS_validation"];
 
 const DEVICE_EXTENSIONS: &[&str] = &["VK_KHR_swapchain"];
 
-// const VERTEX_SHADER_PASS: &'static str = "src/shaders/spv/vert.spv";
-// const FRAGMENT_SHADER_PASS: &'static str = "src/shaders/spv/frag.spv";
+const VERTEX_SHADER_PASS: &'static str = "examples/example/shaders/spv/vert.spv";
+const FRAGMENT_SHADER_PASS: &'static str = "examples/example/shaders/spv/frag.spv";
 
-const MODEL_PATH: &'static str = "src/assets/monkey.obj";
+const MODEL_PATH: &'static str = "examples/example/assets/monkey.obj";
 
 const MAX_FRAMES_IN_FLIGHT: usize = 2;
 
@@ -99,7 +99,7 @@ struct Vertex {
     normal: Vector3<f32>,
 }
 impl Vertex {
-    pub fn get_binding_descriptions() -> [vk::VertexInputBindingDescription; 1] {
+    fn get_binding_descriptions() -> [vk::VertexInputBindingDescription; 1] {
         [vk::VertexInputBindingDescription::builder()
             .binding(0)
             .stride(std::mem::size_of::<Self>() as u32)
@@ -107,7 +107,7 @@ impl Vertex {
             .build()]
     }
 
-    pub fn get_attribute_descriptions() -> [vk::VertexInputAttributeDescription; 2] {
+    fn get_attribute_descriptions() -> [vk::VertexInputAttributeDescription; 2] {
         [
             vk::VertexInputAttributeDescription::builder()
                 .binding(0)
@@ -127,7 +127,7 @@ impl Vertex {
 
 // Uniform Buffer object
 #[derive(AsStd140)]
-pub struct UniformBufferObject {
+struct UniformBufferObject {
     light: mint::Vector3<f32>,
     model: mint::ColumnMatrix4<f32>,
     view: mint::ColumnMatrix4<f32>,
@@ -135,16 +135,16 @@ pub struct UniformBufferObject {
 }
 
 #[derive(Debug, PartialEq)]
-pub enum EguiTheme {
+enum EguiTheme {
     Dark,
     Light,
 }
 
 // main app
-pub struct App {
+struct App {
     width: u32,
     height: u32,
-    pub window: Window,
+    window: Window,
     _entry: Entry,
     instance: Instance,
     #[cfg(debug_assertions)]
@@ -188,65 +188,75 @@ pub struct App {
     render_finished_semaphores: Vec<vk::Semaphore>,
     command_buffers: Vec<vk::CommandBuffer>,
 
-    pub egui_integration: ManuallyDrop<egui_winit_ash_integration::Integration<Arc<Mutex<Allocator>>>>,
+    egui_integration: ManuallyDrop<egui_winit_ash_integration::Integration<Arc<Mutex<Allocator>>>>,
     theme: EguiTheme,
     rotation: f32,
     light_position: Vector3<f32>,
     text: String,
-    pub frameTime: std::time::SystemTime,
-    pub frameRate: f64,
-    pub frameTimeUsed: f64
 }
 impl App {
+    fn new(event_loop: &EventLoop<()>) -> Result<Self> {
+        let (width, height) = (800, 600);
+        let title = "Test";
 
+        // Create Window
+        let window = WindowBuilder::new()
+            .with_title(title)
+            .with_inner_size(PhysicalSize::new(width, height))
+            .with_resizable(true)
+            .build(event_loop)?;
 
-    fn create_instance(title: &str, window: &Window, entry: &Entry) -> Result<Instance> {
-        // App info
-        let app_name = CString::new(title)?;
-        let engine_name = CString::new("Vulkan Engine")?;
-        let app_info = vk::ApplicationInfo::builder()
-            .api_version(vk::make_api_version(0, 1, 2, 0))
-            .application_version(vk::make_api_version(0, 0, 1, 0))
-            .application_name(&app_name)
-            .engine_version(vk::make_api_version(0, 0, 1, 0))
-            .engine_name(&engine_name);
+        // Create Entry
+        let entry = unsafe { Entry::new() }?;
 
-        // Get extensions for creating Surface
-        let extension_names = enumerate_required_extensions(window)?;
-        let mut extension_names = extension_names
-            .iter()
-            .map(|name| name.as_ptr())
-            .collect::<Vec<_>>();
-        if ENABLE_VALIDATION_LAYERS {
-            extension_names.push(DebugUtils::name().as_ptr());
-        }
+        // Create Instance
+        let instance = {
+            // App info
+            let app_name = CString::new(title)?;
+            let engine_name = CString::new("Vulkan Engine")?;
+            let app_info = vk::ApplicationInfo::builder()
+                .api_version(vk::make_api_version(0, 1, 2, 0))
+                .application_version(vk::make_api_version(0, 0, 1, 0))
+                .application_name(&app_name)
+                .engine_version(vk::make_api_version(0, 0, 1, 0))
+                .engine_name(&engine_name);
 
-        // layer for validation
-        let enabled_layer_names = VALIDATION
-            .iter()
-            .map(|layer_name| CString::new(*layer_name).unwrap())
-            .collect::<Vec<_>>();
-        let enabled_layer_names = enabled_layer_names
-            .iter()
-            .map(|layer_name| layer_name.as_ptr())
-            .collect::<Vec<_>>();
+            // Get extensions for creating Surface
+            let extension_names = enumerate_required_extensions(&window)?;
+            let mut extension_names = extension_names
+                .iter()
+                .map(|name| name.as_ptr())
+                .collect::<Vec<_>>();
+            if ENABLE_VALIDATION_LAYERS {
+                extension_names.push(DebugUtils::name().as_ptr());
+            }
 
-        // instance create info
-        let create_info = vk::InstanceCreateInfo::builder()
-            .application_info(&app_info)
-            .enabled_extension_names(&extension_names);
-        let create_info = if ENABLE_VALIDATION_LAYERS {
-            create_info.enabled_layer_names(&enabled_layer_names)
-        } else {
-            create_info
+            // layer for validation
+            let enabled_layer_names = VALIDATION
+                .iter()
+                .map(|layer_name| CString::new(*layer_name).unwrap())
+                .collect::<Vec<_>>();
+            let enabled_layer_names = enabled_layer_names
+                .iter()
+                .map(|layer_name| layer_name.as_ptr())
+                .collect::<Vec<_>>();
+
+            // instance create info
+            let create_info = vk::InstanceCreateInfo::builder()
+                .application_info(&app_info)
+                .enabled_extension_names(&extension_names);
+            let create_info = if ENABLE_VALIDATION_LAYERS {
+                create_info.enabled_layer_names(&enabled_layer_names)
+            } else {
+                create_info
+            };
+
+            // crate instance
+            unsafe { entry.create_instance(&create_info, None)? }
         };
 
-        // crate instance
-        Ok(unsafe { entry.create_instance(&create_info, None)? })
-    }
-
-    #[cfg(debug_assertions)]
-    fn create_debug_callbacks(entry: &Entry, instance: &Instance) -> Result<(DebugUtils, DebugUtilsMessengerEXT)> {
+        #[cfg(debug_assertions)]
+        let (debug_utils_loader, debug_callback) = {
             // callback function
             unsafe extern "system" fn callback(
                 message_severity: vk::DebugUtilsMessageSeverityFlagsEXT,
@@ -286,19 +296,19 @@ impl App {
                             | vk::DebugUtilsMessageTypeFlagsEXT::VALIDATION,
                     )
                     .pfn_user_callback(Some(callback));
-            let debug_utils_loader = DebugUtils::new(entry, instance);
+            let debug_utils_loader = DebugUtils::new(&entry, &instance);
             let debug_callback = unsafe {
                 debug_utils_loader
                     .create_debug_utils_messenger(&debug_utils_messenger_create_info_ext, None)?
             };
+            (debug_utils_loader, debug_callback)
+        };
 
-            Ok((debug_utils_loader, debug_callback))
-    }
-
-    fn create_surface(entry: &Entry, instance: &Instance, window: &Window) -> Result<(Surface, vk::SurfaceKHR, vk::PhysicalDevice, u32, u32)> {
+        // Create Surface
         let surface_loader = Surface::new(&entry, &instance);
-        let surface = unsafe { create_surface(&entry, &instance, window, None)? };
+        let surface = unsafe { create_surface(&entry, &instance, &window, None)? };
 
+        // Select Physical Device
         let (physical_device, graphics_queue_index, present_queue_index) = {
             // filter physical device
             let physical_devices = unsafe { instance.enumerate_physical_devices()? };
@@ -391,56 +401,57 @@ impl App {
             physical_devices.next().unwrap()
         };
 
-        Ok((surface_loader, surface, physical_device, graphics_queue_index, present_queue_index))
-    }
+        // Create Device
+        let device = {
+            let mut unique_queue_families = HashSet::new();
+            unique_queue_families.insert(graphics_queue_index);
+            unique_queue_families.insert(present_queue_index);
 
-    fn create_device(instance: &Instance, graphics_queue_index: u32, present_queue_index: u32, physical_device: &vk::PhysicalDevice) -> Result<Device> {
-        let mut unique_queue_families = HashSet::new();
-        unique_queue_families.insert(graphics_queue_index);
-        unique_queue_families.insert(present_queue_index);
+            let queue_priorities = [1.0];
+            let mut queue_create_infos = vec![];
+            for &queue_family in unique_queue_families.iter() {
+                let queue_create_info = vk::DeviceQueueCreateInfo::builder()
+                    .queue_family_index(queue_family)
+                    .queue_priorities(&queue_priorities)
+                    .build();
+                queue_create_infos.push(queue_create_info);
+            }
 
-        let queue_priorities = [1.0];
-        let mut queue_create_infos = vec![];
-        for &queue_family in unique_queue_families.iter() {
-            let queue_create_info = vk::DeviceQueueCreateInfo::builder()
-                .queue_family_index(queue_family)
-                .queue_priorities(&queue_priorities)
-                .build();
-            queue_create_infos.push(queue_create_info);
-        }
+            let enabled_extension_names = [Swapchain::name().as_ptr()];
 
-        let enabled_extension_names = [Swapchain::name().as_ptr()];
+            let device_create_info = vk::DeviceCreateInfo::builder()
+                .queue_create_infos(queue_create_infos.as_slice())
+                .enabled_extension_names(&enabled_extension_names);
 
-        let device_create_info = vk::DeviceCreateInfo::builder()
-            .queue_create_infos(queue_create_infos.as_slice())
-            .enabled_extension_names(&enabled_extension_names);
+            unsafe { instance.create_device(physical_device, &device_create_info, None)? }
+        };
 
-        Ok(unsafe { instance.create_device(*physical_device, &device_create_info, None)? })
-    }
+        // Create Queues
+        let graphics_queue = unsafe { device.get_device_queue(graphics_queue_index, 0) };
+        let present_queue = unsafe { device.get_device_queue(present_queue_index, 0) };
 
-    fn create_command_pool(graphics_queue_index: u32, device: &Device) -> Result<vk::CommandPool> {
+        // Create Graphics Command Pool
+        let graphics_command_pool = {
+            let command_pool_create_info = vk::CommandPoolCreateInfo::builder()
+                .queue_family_index(graphics_queue_index)
+                .flags(vk::CommandPoolCreateFlags::RESET_COMMAND_BUFFER);
+            unsafe { device.create_command_pool(&command_pool_create_info, None)? }
+        };
 
-        let command_pool_create_info = vk::CommandPoolCreateInfo::builder()
-        .queue_family_index(graphics_queue_index)
-        .flags(vk::CommandPoolCreateFlags::RESET_COMMAND_BUFFER);
-        Ok(unsafe { device.create_command_pool(&command_pool_create_info, None)? })
-    }
-
-    fn create_swapchain(width: u32, height: u32, graphics_queue_index: u32, present_queue_index: u32, surface_loader: &Surface, surface: &vk::SurfaceKHR, physical_device: &vk::PhysicalDevice, instance: &Instance, device: &Device) -> Result<(Swapchain, vk::SwapchainKHR, vk::SurfaceFormatKHR, vk::Extent2D, Vec<vk::Image>)> {
-
+        // Create Swapchain
         let swapchain_loader = Swapchain::new(&instance, &device);
         let (swapchain, format, extent) = {
             let capabilities = unsafe {
-                surface_loader.get_physical_device_surface_capabilities(*physical_device, *surface)?
+                surface_loader.get_physical_device_surface_capabilities(physical_device, surface)?
             };
             let formats = unsafe {
                 surface_loader
-                    .get_physical_device_surface_formats(*physical_device, *surface)
+                    .get_physical_device_surface_formats(physical_device, surface)
                     .unwrap()
             };
             let present_modes = unsafe {
                 surface_loader
-                    .get_physical_device_surface_present_modes(*physical_device, *surface)
+                    .get_physical_device_surface_present_modes(physical_device, surface)
                     .unwrap()
             };
 
@@ -488,7 +499,7 @@ impl App {
                 };
 
             let swapchain_create_info = vk::SwapchainCreateInfoKHR::builder()
-                .surface(*surface)
+                .surface(surface)
                 .min_image_count(image_count)
                 .image_format(format.format)
                 .image_color_space(format.color_space)
@@ -508,259 +519,6 @@ impl App {
         };
         let swapchain_images = unsafe { swapchain_loader.get_swapchain_images(swapchain)? };
 
-        Ok((swapchain_loader, swapchain, format, extent, swapchain_images))
-    }
-
-    fn create_render_pass(device: &Device, format: &vk::SurfaceFormatKHR) -> Result<vk::RenderPass> {
-        // Attachments
-        let attachments = [
-            vk::AttachmentDescription::builder()
-                .format(format.format)
-                .samples(vk::SampleCountFlags::TYPE_1)
-                .load_op(vk::AttachmentLoadOp::CLEAR)
-                .store_op(vk::AttachmentStoreOp::STORE)
-                .stencil_load_op(vk::AttachmentLoadOp::DONT_CARE)
-                .stencil_store_op(vk::AttachmentStoreOp::DONT_CARE)
-                .initial_layout(vk::ImageLayout::UNDEFINED)
-                .final_layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
-                .build(),
-            vk::AttachmentDescription::builder()
-                .format(vk::Format::D32_SFLOAT)
-                .samples(vk::SampleCountFlags::TYPE_1)
-                .load_op(vk::AttachmentLoadOp::CLEAR)
-                .store_op(vk::AttachmentStoreOp::DONT_CARE)
-                .stencil_load_op(vk::AttachmentLoadOp::DONT_CARE)
-                .stencil_store_op(vk::AttachmentStoreOp::DONT_CARE)
-                .initial_layout(vk::ImageLayout::UNDEFINED)
-                .final_layout(vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL)
-                .build(),
-        ];
-        // color reference
-        let color_reference = [vk::AttachmentReference::builder()
-            .attachment(0)
-            .layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
-            .build()];
-        // depth reference
-        let depth_reference = vk::AttachmentReference::builder()
-            .attachment(1)
-            .layout(vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
-        // subpass descriptionを作成
-        let subpasses = [vk::SubpassDescription::builder()
-            .pipeline_bind_point(vk::PipelineBindPoint::GRAPHICS)
-            .color_attachments(&color_reference)
-            .depth_stencil_attachment(&depth_reference)
-            .build()];
-        // create render pass
-        let render_pass_create_info = vk::RenderPassCreateInfo::builder()
-            .attachments(&attachments)
-            .subpasses(&subpasses);
-
-        Ok(unsafe { device.create_render_pass(&render_pass_create_info, None)? })
-    }
-
-    fn create_frame_and_depth_buffers(swapchain_images: &Vec<vk::Image>, device: &Device, format: &vk::SurfaceFormatKHR, extent: &vk::Extent2D, allocator: &mut Allocator, render_pass: &vk::RenderPass) -> Result<(Vec<vk::Framebuffer>, Vec<vk::Image>, Vec<Allocation>, Vec<vk::ImageView>, Vec<vk::ImageView>)> {
-        let mut framebuffers = vec![];
-        let mut depth_images = vec![];
-        let mut depth_image_allocations = vec![];
-        let mut color_image_views = vec![];
-        let mut depth_image_views = vec![];
-
-        for &image in swapchain_images.iter() {
-            let mut attachments = vec![];
-
-            let color_attachment = unsafe {
-                device.create_image_view(
-                    &vk::ImageViewCreateInfo::builder()
-                        .image(image)
-                        .view_type(vk::ImageViewType::TYPE_2D)
-                        .format(format.format)
-                        .subresource_range(
-                            vk::ImageSubresourceRange::builder()
-                                .aspect_mask(vk::ImageAspectFlags::COLOR)
-                                .base_mip_level(0)
-                                .level_count(1)
-                                .base_array_layer(0)
-                                .layer_count(1)
-                                .build(),
-                        ),
-                    None,
-                )?
-            };
-            attachments.push(color_attachment);
-            color_image_views.push(color_attachment);
-
-            let depth_image_create_info = vk::ImageCreateInfo::builder()
-                .format(vk::Format::D32_SFLOAT)
-                .samples(vk::SampleCountFlags::TYPE_1)
-                .mip_levels(1)
-                .array_layers(1)
-                .usage(vk::ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT)
-                .initial_layout(vk::ImageLayout::UNDEFINED)
-                .image_type(vk::ImageType::TYPE_2D)
-                .extent(vk::Extent3D {
-                    width: extent.width,
-                    height: extent.height,
-                    depth: 1,
-                });
-            let depth_image = unsafe { device.create_image(&depth_image_create_info, None)? };
-            let depth_image_requirements =
-                unsafe { device.get_image_memory_requirements(depth_image) };
-            let depth_image_allocation = allocator.allocate(&AllocationCreateDesc {
-                name: "depth image",
-                requirements: depth_image_requirements,
-                location: gpu_allocator::MemoryLocation::GpuOnly,
-                linear: false,
-            })?;
-            unsafe {
-                device.bind_image_memory(
-                    depth_image,
-                    depth_image_allocation.memory(),
-                    depth_image_allocation.offset(),
-                )?;
-            }
-            depth_images.push(depth_image);
-            depth_image_allocations.push(depth_image_allocation);
-            let depth_attachment = unsafe {
-                device.create_image_view(
-                    &vk::ImageViewCreateInfo::builder()
-                        .image(depth_image)
-                        .view_type(vk::ImageViewType::TYPE_2D)
-                        .format(vk::Format::D32_SFLOAT)
-                        .subresource_range(
-                            vk::ImageSubresourceRange::builder()
-                                .aspect_mask(vk::ImageAspectFlags::DEPTH)
-                                .base_mip_level(0)
-                                .level_count(1)
-                                .base_array_layer(0)
-                                .layer_count(1)
-                                .build(),
-                        ),
-                    None,
-                )?
-            };
-            attachments.push(depth_attachment);
-            depth_image_views.push(depth_attachment);
-            framebuffers.push(unsafe {
-                device.create_framebuffer(
-                    &vk::FramebufferCreateInfo::builder()
-                        .render_pass(*render_pass)
-                        .attachments(attachments.as_slice())
-                        .width(extent.width)
-                        .height(extent.height)
-                        .layers(1),
-                    None,
-                )?
-            });
-        }
-
-        Ok((
-            framebuffers,
-            depth_images,
-            depth_image_allocations,
-            color_image_views,
-            depth_image_views,
-        ))
-    }
-
-    fn prepare_uniform_buffer(swapchain_images: &Vec<vk::Image>, device: &Device, allocator: &mut Allocator) -> Result<(Vec<vk::Buffer>, Vec<Allocation>)> {
-        Ok((0..swapchain_images.len())
-        .map(|_| {
-            // Calculate size
-            let buffer_size = std::mem::size_of::<Std140UniformBufferObject>() as u64;
-            // Reserve buffer
-            let buffer = unsafe {
-                device
-                    .create_buffer(
-                        &vk::BufferCreateInfo::builder()
-                            .size(buffer_size)
-                            .usage(vk::BufferUsageFlags::UNIFORM_BUFFER),
-                        None,
-                    )
-                    .unwrap()
-            };
-            let requirements = unsafe { device.get_buffer_memory_requirements(buffer) };
-            let buffer_allocation = allocator
-                .allocate(&AllocationCreateDesc {
-                    name: "uniform buffer",
-                    requirements,
-                    location: gpu_allocator::MemoryLocation::CpuToGpu,
-                    linear: true,
-                })
-                .unwrap();
-            unsafe {
-                device
-                    .bind_buffer_memory(
-                        buffer,
-                        buffer_allocation.memory(),
-                        buffer_allocation.offset(),
-                    )
-                    .unwrap();
-            }
-            (buffer, buffer_allocation)
-        })
-        .unzip::<_, _, Vec<_>, Vec<_>>())
-    }
-
-    fn create_descriptor_pool(swapchain_images: &Vec<vk::Image>, device: &Device) -> Result<vk::DescriptorPool> {
-            let pool_sizes = [vk::DescriptorPoolSize::builder()
-            .ty(vk::DescriptorType::UNIFORM_BUFFER)
-            .descriptor_count(swapchain_images.len() as u32)
-            .build()];
-        let descriptor_pool_create_info = vk::DescriptorPoolCreateInfo::builder()
-            .max_sets(swapchain_images.len() as u32)
-            .pool_sizes(&pool_sizes);
-
-        Ok(unsafe { device.create_descriptor_pool(&descriptor_pool_create_info, None)? })
-    }
-
-    pub fn new(event_loop: &EventLoop<()>) -> Result<Self> {
-        let (width, height) = (800, 600);
-        let title = "Test";
-
-        // Create Window
-        let window = WindowBuilder::new()
-            .with_title(title)
-            .with_inner_size(PhysicalSize::new(width, height))
-            .with_resizable(true)
-            .build(event_loop)?;
-
-        // Create Entry
-        let entry = unsafe { Entry::new() }?;
-
-        // Create Instance
-        let instance = Self::create_instance(title, &window, &entry)?;
-
-        #[cfg(debug_assertions)]
-        let (debug_utils_loader, debug_callback) = Self::create_debug_callbacks(&entry, &instance)?;
-
-        // Create Surface
-        let (
-            surface_loader, 
-            surface, 
-            physical_device, 
-            graphics_queue_index, 
-            present_queue_index
-        ) = Self::create_surface(&entry, &instance, &window)?;
-
-        // Create Device
-        let device = Self::create_device(&instance, graphics_queue_index, present_queue_index, &physical_device)?;
-
-        // Create Queues
-        let graphics_queue = unsafe { device.get_device_queue(graphics_queue_index, 0) };
-        let present_queue = unsafe { device.get_device_queue(present_queue_index, 0) };
-
-        // Create Graphics Command Pool
-        let graphics_command_pool = Self::create_command_pool(graphics_queue_index, &device)?;
-
-        // Create Swapchain
-        let (
-            swapchain_loader, 
-            swapchain, 
-            format, 
-            extent, 
-            swapchain_images
-        ) = Self::create_swapchain(width, height, graphics_queue_index, present_queue_index, &surface_loader, &surface, &physical_device, &instance, &device)?;
-
         // Prepare gpu-allocator's Allocator
         let mut allocator = {
             Allocator::new(&AllocatorCreateDesc {
@@ -773,7 +531,51 @@ impl App {
         };
 
         // Create RenderPass
-        let render_pass = Self::create_render_pass(&device, &format)?;
+        let render_pass = {
+            // Attachments
+            let attachments = [
+                vk::AttachmentDescription::builder()
+                    .format(format.format)
+                    .samples(vk::SampleCountFlags::TYPE_1)
+                    .load_op(vk::AttachmentLoadOp::CLEAR)
+                    .store_op(vk::AttachmentStoreOp::STORE)
+                    .stencil_load_op(vk::AttachmentLoadOp::DONT_CARE)
+                    .stencil_store_op(vk::AttachmentStoreOp::DONT_CARE)
+                    .initial_layout(vk::ImageLayout::UNDEFINED)
+                    .final_layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
+                    .build(),
+                vk::AttachmentDescription::builder()
+                    .format(vk::Format::D32_SFLOAT)
+                    .samples(vk::SampleCountFlags::TYPE_1)
+                    .load_op(vk::AttachmentLoadOp::CLEAR)
+                    .store_op(vk::AttachmentStoreOp::DONT_CARE)
+                    .stencil_load_op(vk::AttachmentLoadOp::DONT_CARE)
+                    .stencil_store_op(vk::AttachmentStoreOp::DONT_CARE)
+                    .initial_layout(vk::ImageLayout::UNDEFINED)
+                    .final_layout(vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL)
+                    .build(),
+            ];
+            // color reference
+            let color_reference = [vk::AttachmentReference::builder()
+                .attachment(0)
+                .layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
+                .build()];
+            // depth reference
+            let depth_reference = vk::AttachmentReference::builder()
+                .attachment(1)
+                .layout(vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+            // subpass descriptionを作成
+            let subpasses = [vk::SubpassDescription::builder()
+                .pipeline_bind_point(vk::PipelineBindPoint::GRAPHICS)
+                .color_attachments(&color_reference)
+                .depth_stencil_attachment(&depth_reference)
+                .build()];
+            // create render pass
+            let render_pass_create_info = vk::RenderPassCreateInfo::builder()
+                .attachments(&attachments)
+                .subpasses(&subpasses);
+            unsafe { device.create_render_pass(&render_pass_create_info, None)? }
+        };
 
         // Create framebuffers and depth buffers
         let (
@@ -782,16 +584,160 @@ impl App {
             depth_image_allocations,
             color_image_views,
             depth_image_views,
-        ) = Self::create_frame_and_depth_buffers(&swapchain_images, &device, &format, &extent, &mut allocator, &render_pass)?;
+        ) = {
+            let mut framebuffers = vec![];
+            let mut depth_images = vec![];
+            let mut depth_image_allocations = vec![];
+            let mut color_image_views = vec![];
+            let mut depth_image_views = vec![];
+
+            for &image in swapchain_images.iter() {
+                let mut attachments = vec![];
+
+                let color_attachment = unsafe {
+                    device.create_image_view(
+                        &vk::ImageViewCreateInfo::builder()
+                            .image(image)
+                            .view_type(vk::ImageViewType::TYPE_2D)
+                            .format(format.format)
+                            .subresource_range(
+                                vk::ImageSubresourceRange::builder()
+                                    .aspect_mask(vk::ImageAspectFlags::COLOR)
+                                    .base_mip_level(0)
+                                    .level_count(1)
+                                    .base_array_layer(0)
+                                    .layer_count(1)
+                                    .build(),
+                            ),
+                        None,
+                    )?
+                };
+                attachments.push(color_attachment);
+                color_image_views.push(color_attachment);
+
+                let depth_image_create_info = vk::ImageCreateInfo::builder()
+                    .format(vk::Format::D32_SFLOAT)
+                    .samples(vk::SampleCountFlags::TYPE_1)
+                    .mip_levels(1)
+                    .array_layers(1)
+                    .usage(vk::ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT)
+                    .initial_layout(vk::ImageLayout::UNDEFINED)
+                    .image_type(vk::ImageType::TYPE_2D)
+                    .extent(vk::Extent3D {
+                        width: extent.width,
+                        height: extent.height,
+                        depth: 1,
+                    });
+                let depth_image = unsafe { device.create_image(&depth_image_create_info, None)? };
+                let depth_image_requirements =
+                    unsafe { device.get_image_memory_requirements(depth_image) };
+                let depth_image_allocation = allocator.allocate(&AllocationCreateDesc {
+                    name: "depth image",
+                    requirements: depth_image_requirements,
+                    location: gpu_allocator::MemoryLocation::GpuOnly,
+                    linear: false,
+                })?;
+                unsafe {
+                    device.bind_image_memory(
+                        depth_image,
+                        depth_image_allocation.memory(),
+                        depth_image_allocation.offset(),
+                    )?;
+                }
+                depth_images.push(depth_image);
+                depth_image_allocations.push(depth_image_allocation);
+                let depth_attachment = unsafe {
+                    device.create_image_view(
+                        &vk::ImageViewCreateInfo::builder()
+                            .image(depth_image)
+                            .view_type(vk::ImageViewType::TYPE_2D)
+                            .format(vk::Format::D32_SFLOAT)
+                            .subresource_range(
+                                vk::ImageSubresourceRange::builder()
+                                    .aspect_mask(vk::ImageAspectFlags::DEPTH)
+                                    .base_mip_level(0)
+                                    .level_count(1)
+                                    .base_array_layer(0)
+                                    .layer_count(1)
+                                    .build(),
+                            ),
+                        None,
+                    )?
+                };
+                attachments.push(depth_attachment);
+                depth_image_views.push(depth_attachment);
+                framebuffers.push(unsafe {
+                    device.create_framebuffer(
+                        &vk::FramebufferCreateInfo::builder()
+                            .render_pass(render_pass)
+                            .attachments(attachments.as_slice())
+                            .width(extent.width)
+                            .height(extent.height)
+                            .layers(1),
+                        None,
+                    )?
+                });
+            }
+
+            (
+                framebuffers,
+                depth_images,
+                depth_image_allocations,
+                color_image_views,
+                depth_image_views,
+            )
+        };
 
         // Prepare UniformBuffer
-        let (uniform_buffers, uniform_buffer_allocations) = Self::prepare_uniform_buffer(&swapchain_images, &device, &mut allocator)?;
-
-
-
+        let (uniform_buffers, uniform_buffer_allocations) = {
+            (0..swapchain_images.len())
+                .map(|_| {
+                    // Calculate size
+                    let buffer_size = std::mem::size_of::<Std140UniformBufferObject>() as u64;
+                    // Reserve buffer
+                    let buffer = unsafe {
+                        device
+                            .create_buffer(
+                                &vk::BufferCreateInfo::builder()
+                                    .size(buffer_size)
+                                    .usage(vk::BufferUsageFlags::UNIFORM_BUFFER),
+                                None,
+                            )
+                            .unwrap()
+                    };
+                    let requirements = unsafe { device.get_buffer_memory_requirements(buffer) };
+                    let buffer_allocation = allocator
+                        .allocate(&AllocationCreateDesc {
+                            name: "uniform buffer",
+                            requirements,
+                            location: gpu_allocator::MemoryLocation::CpuToGpu,
+                            linear: true,
+                        })
+                        .unwrap();
+                    unsafe {
+                        device
+                            .bind_buffer_memory(
+                                buffer,
+                                buffer_allocation.memory(),
+                                buffer_allocation.offset(),
+                            )
+                            .unwrap();
+                    }
+                    (buffer, buffer_allocation)
+                })
+                .unzip::<_, _, Vec<_>, Vec<_>>()
+        };
         // Create DescriptorPool
-        let descriptor_pool = Self::create_descriptor_pool(&swapchain_images, &device)?;
-
+        let descriptor_pool = {
+            let pool_sizes = [vk::DescriptorPoolSize::builder()
+                .ty(vk::DescriptorType::UNIFORM_BUFFER)
+                .descriptor_count(swapchain_images.len() as u32)
+                .build()];
+            let descriptor_pool_create_info = vk::DescriptorPoolCreateInfo::builder()
+                .max_sets(swapchain_images.len() as u32)
+                .pool_sizes(&pool_sizes);
+            unsafe { device.create_descriptor_pool(&descriptor_pool_create_info, None)? }
+        };
         // Create Descriptor Set Layout Bindings
         let descriptor_set_layout_bindings = vec![vk::DescriptorSetLayoutBinding::builder()
             .descriptor_type(vk::DescriptorType::UNIFORM_BUFFER)
@@ -799,7 +745,6 @@ impl App {
             .binding(0)
             .stage_flags(vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT)
             .build()];
-
         // Create Descriptor Set Layout
         let descriptor_set_layouts = (0..swapchain_images.len())
             .map(|_| {
@@ -813,7 +758,6 @@ impl App {
                 }
             })
             .collect::<Vec<_>>();
-    
         // Cerate Descriptor Sets
         let descriptor_sets = {
             let descriptor_set_allocate_info = vk::DescriptorSetAllocateInfo::builder()
@@ -821,7 +765,6 @@ impl App {
                 .set_layouts(descriptor_set_layouts.as_slice());
             unsafe { device.allocate_descriptor_sets(&descriptor_set_allocate_info) }
         }?;
-
         // Update Descriptor sets
         for i in 0..swapchain_images.len() {
             let descriptor_buffer_infos = [vk::DescriptorBufferInfo::builder()
@@ -840,9 +783,6 @@ impl App {
             }
         }
 
-
-
-
         // Setup Graphics Pipeline
         let (graphics_pipeline, pipeline_layout) = {
             // load shaders
@@ -850,7 +790,7 @@ impl App {
                 use std::fs::File;
                 use std::io::Read;
 
-                let spv_file = include_bytes!("../shaders/spv/vert.spv");
+                let spv_file = File::open(&Path::new(VERTEX_SHADER_PASS))?;
                 let bytes_code: Vec<u8> = spv_file.bytes().filter_map(|byte| byte.ok()).collect();
 
                 let shader_module_create_info = vk::ShaderModuleCreateInfo {
@@ -864,7 +804,7 @@ impl App {
                 use std::fs::File;
                 use std::io::Read;
 
-                let spv_file = include_bytes!("../shaders/spv/frag.spv");
+                let spv_file = File::open(&Path::new(FRAGMENT_SHADER_PASS))?;
                 let bytes_code: Vec<u8> = spv_file.bytes().filter_map(|byte| byte.ok()).collect();
 
                 let shader_module_create_info = vk::ShaderModuleCreateInfo {
@@ -1234,13 +1174,10 @@ impl App {
             rotation: 0.0,
             light_position: Vector3::new(0.0, -16.0, -16.0),
             text: "Hello egui!".to_string(),
-            frameTime: std::time::SystemTime::now(),
-            frameRate: Default::default(),
-            frameTimeUsed: Default::default()
         })
     }
 
-    pub fn draw(&mut self) -> Result<()> {
+    fn draw(&mut self) -> Result<()> {
         if self.width == 0 || self.height == 0 {
             return Ok(());
         }
@@ -1388,46 +1325,78 @@ impl App {
             }
 
             self.egui_integration.begin_frame();
-
-            egui::Window::new("Vulkan Example")
+            egui::SidePanel::left("my_side_panel").show(&self.egui_integration.context(), |ui| {
+                ui.heading("Hello");
+                ui.label("Hello egui!");
+                ui.separator();
+                ui.horizontal(|ui| {
+                    ui.label("Theme");
+                    let id = ui.make_persistent_id("theme_combo_box_side");
+                    egui::ComboBox::from_id_source(id)
+                        .selected_text(format!("{:?}", self.theme))
+                        .show_ui(ui, |ui| {
+                            ui.selectable_value(&mut self.theme, EguiTheme::Dark, "Dark");
+                            ui.selectable_value(&mut self.theme, EguiTheme::Light, "Light");
+                        });
+                });
+                ui.separator();
+                ui.hyperlink("https://github.com/emilk/egui");
+                ui.separator();
+                ui.label("Rotation");
+                ui.add(egui::widgets::DragValue::new(&mut self.rotation));
+                ui.add(egui::widgets::Slider::new(
+                    &mut self.rotation,
+                    -180.0..=180.0,
+                ));
+                ui.label("Light Position");
+                ui.horizontal(|ui| {
+                    ui.label("x:");
+                    ui.add(egui::widgets::DragValue::new(&mut self.light_position.x));
+                    ui.label("y:");
+                    ui.add(egui::widgets::DragValue::new(&mut self.light_position.y));
+                    ui.label("z:");
+                    ui.add(egui::widgets::DragValue::new(&mut self.light_position.z));
+                });
+                ui.separator();
+                ui.text_edit_singleline(&mut self.text);
+            });
+            egui::Window::new("My Window")
                 .resizable(true)
                 .scroll(true)
                 .show(&self.egui_integration.context(), |ui| {
-                    ui.label(format!("FPS: {:.2}", self.frameRate));
-                    ui.label(format!("Frame Time: {:.3}ms, {:.2}%", self.frameTimeUsed / 1000.0f64, (self.frameTimeUsed as f64 / 16666.0f64) * 100.0f64));
-                    // ui.heading("Hello");
-                    // ui.label("Hello egui!");
-                    // ui.separator();
-                    // ui.horizontal(|ui| {
-                    //     ui.label("Theme");
-                    //     let id = ui.make_persistent_id("theme_combo_box_window");
-                    //     egui::ComboBox::from_id_source(id)
-                    //         .selected_text(format!("{:?}", self.theme))
-                    //         .show_ui(ui, |ui| {
-                    //             ui.selectable_value(&mut self.theme, EguiTheme::Dark, "Dark");
-                    //             ui.selectable_value(&mut self.theme, EguiTheme::Light, "Light");
-                    //         });
-                    // });
-                    // ui.separator();
-                    // ui.hyperlink("https://github.com/emilk/egui");
-                    // ui.separator();
-                    // ui.label("Rotation");
-                    // ui.add(egui::widgets::DragValue::new(&mut self.rotation));
-                    // ui.add(egui::widgets::Slider::new(
-                    //     &mut self.rotation,
-                    //     -180.0..=180.0,
-                    // ));
-                    // ui.label("Light Position");
-                    // ui.horizontal(|ui| {
-                    //     ui.label("x:");
-                    //     ui.add(egui::widgets::DragValue::new(&mut self.light_position.x));
-                    //     ui.label("y:");
-                    //     ui.add(egui::widgets::DragValue::new(&mut self.light_position.y));
-                    //     ui.label("z:");
-                    //     ui.add(egui::widgets::DragValue::new(&mut self.light_position.z));
-                    // });
-                    // ui.separator();
-                    // ui.text_edit_singleline(&mut self.text);
+                    ui.heading("Hello");
+                    ui.label("Hello egui!");
+                    ui.separator();
+                    ui.horizontal(|ui| {
+                        ui.label("Theme");
+                        let id = ui.make_persistent_id("theme_combo_box_window");
+                        egui::ComboBox::from_id_source(id)
+                            .selected_text(format!("{:?}", self.theme))
+                            .show_ui(ui, |ui| {
+                                ui.selectable_value(&mut self.theme, EguiTheme::Dark, "Dark");
+                                ui.selectable_value(&mut self.theme, EguiTheme::Light, "Light");
+                            });
+                    });
+                    ui.separator();
+                    ui.hyperlink("https://github.com/emilk/egui");
+                    ui.separator();
+                    ui.label("Rotation");
+                    ui.add(egui::widgets::DragValue::new(&mut self.rotation));
+                    ui.add(egui::widgets::Slider::new(
+                        &mut self.rotation,
+                        -180.0..=180.0,
+                    ));
+                    ui.label("Light Position");
+                    ui.horizontal(|ui| {
+                        ui.label("x:");
+                        ui.add(egui::widgets::DragValue::new(&mut self.light_position.x));
+                        ui.label("y:");
+                        ui.add(egui::widgets::DragValue::new(&mut self.light_position.y));
+                        ui.label("z:");
+                        ui.add(egui::widgets::DragValue::new(&mut self.light_position.z));
+                    });
+                    ui.separator();
+                    ui.text_edit_singleline(&mut self.text);
                 });
             let (_, shapes) = self.egui_integration.end_frame(&mut self.window);
             let clipped_meshes = self.egui_integration.context().tessellate(shapes);
@@ -1469,7 +1438,7 @@ impl App {
         Ok(())
     }
 
-    pub fn recreate_swapchain(&mut self) -> Result<()> {
+    fn recreate_swapchain(&mut self) -> Result<()> {
         let size = self.window.inner_size();
         self.width = size.width;
         self.height = size.height;
@@ -1836,4 +1805,26 @@ impl Drop for App {
             self.instance.destroy_instance(None);
         }
     }
+}
+
+fn main() -> Result<()> {
+    let event_loop = EventLoop::new();
+    let mut app = App::new(&event_loop)?;
+    event_loop.run(move |event, _, control_flow| {
+        *control_flow = ControlFlow::Poll;
+        app.egui_integration.handle_event(&event);
+        match event {
+            Event::WindowEvent {
+                event: WindowEvent::CloseRequested,
+                ..
+            } => *control_flow = ControlFlow::Exit,
+            Event::WindowEvent {
+                event: WindowEvent::Resized(_),
+                ..
+            } => app.recreate_swapchain().unwrap(),
+            Event::MainEventsCleared => app.window.request_redraw(),
+            Event::RedrawRequested(_window_id) => app.draw().unwrap(),
+            _ => (),
+        }
+    })
 }
